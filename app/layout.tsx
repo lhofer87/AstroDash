@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { ClientDiagnostics } from '@/app/providers/ClientDiagnostics';
 import { StoreHydration } from '@/app/providers/StoreHydration';
 
 /** Enables env(safe-area-inset-*) for notched devices + PWAs */
@@ -24,7 +25,9 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.ico" />
       </head>
       <body className="antialiased">
-        <StoreHydration>{children}</StoreHydration>
+        <ClientDiagnostics>
+          <StoreHydration>{children}</StoreHydration>
+        </ClientDiagnostics>
       </body>
     </html>
   );

@@ -13,6 +13,7 @@ import { fetchSevenTimerViaApi } from '@/lib/api/forecast-client';
 import type { Spot } from '@/lib/types/spot';
 import { useSpotStore } from '@/lib/stores/spot-store';
 import { useMapUiStore } from '@/lib/stores/map-ui-store';
+import { isClientDebugEnabled } from '@/lib/diagnostics/client-debug';
 import {
   isLikelyValidMapboxPublicToken,
   normalizeMapboxToken,
@@ -415,6 +416,17 @@ export function MapView() {
     // (common when raster tiles fail or reload while panning) — Next dev then prints "[browser] Error" repeatedly.
     map.on('error', (e) => {
       const msg = e.error?.message ?? '';
+      if (typeof window !== 'undefined' && isClientDebugEnabled()) {
+        window.dispatchEvent(
+          new CustomEvent('astrodash-diag', {
+            detail: {
+              source: 'mapbox-gl',
+              message: msg || '(empty Mapbox error message)',
+              time: Date.now(),
+            },
+          })
+        );
+      }
       if (mapboxAuthHintShownRef.current) return;
       if (
         /401|403|Unauthorized|Forbidden|Not Authorized|Invalid.*token|invalid.*access token/i.test(
