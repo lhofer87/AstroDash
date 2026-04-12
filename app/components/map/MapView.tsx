@@ -13,18 +13,13 @@ import { fetchSevenTimerViaApi } from '@/lib/api/forecast-client';
 import type { Spot } from '@/lib/types/spot';
 import { useSpotStore } from '@/lib/stores/spot-store';
 import { useMapUiStore } from '@/lib/stores/map-ui-store';
+import {
+  isLikelyValidMapboxPublicToken,
+  normalizeMapboxToken,
+  normalizeOwmKey,
+} from '@/lib/utils/public-env';
 
-const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-
-/** OWM tile URLs need the raw API key only. Mis-set env (e.g. value `NEXT_PUBLIC_OWM_KEY=abc...`) yields 401. */
-function normalizeOwmKey(raw: string | undefined): string | undefined {
-  if (!raw) return undefined;
-  let v = raw.trim();
-  const prefix = 'NEXT_PUBLIC_OWM_KEY=';
-  if (v.startsWith(prefix)) v = v.slice(prefix.length).trim();
-  return v || undefined;
-}
-
+const TOKEN = normalizeMapboxToken(process.env.NEXT_PUBLIC_MAPBOX_TOKEN);
 const OWM_KEY = normalizeOwmKey(process.env.NEXT_PUBLIC_OWM_KEY);
 
 const STYLES: Record<BaseStyle, string> = {
@@ -308,6 +303,8 @@ export function MapView() {
   const [centerSeeing, setCenterSeeing] = useState<number | null>(null);
   const [geoMessage, setGeoMessage] = useState<string | null>(null);
   const [activeSavedSpot, setActiveSavedSpot] = useState<Spot | null>(null);
+  const [mapboxAuthHint, setMapboxAuthHint] = useState<string | null>(null);
+  const mapboxAuthHintShownRef = useRef(false);
 
   const applyLayerVisibility = useCallback(() => {
     const map = mapRef.current;
@@ -386,6 +383,8 @@ export function MapView() {
       zoom: ui.zoom,
       pitch: ui.pitch,
       bearing: ui.bearing,
+      /** Keep north at the top: no drag / pinch / keyboard rotation. */
+      dragRotate: false,
       /** Default false — `true` keeps the WebGL buffer after each frame and tanks performance on phones. Only enable if you export the canvas to an image. */
       preserveDrawingBuffer: false,
       /** Slightly cheaper GPU path on touch devices (Mapbox still looks fine for map tiles). */
@@ -395,6 +394,9 @@ export function MapView() {
     });
 
     mapRef.current = map;
+
+    map.touchZoomRotate.disableRotation();
+    map.keyboard.disableRotation();
 
     const persistView = () => {
       const c = map.getCenter();
@@ -411,7 +413,20 @@ export function MapView() {
 
     // Without an 'error' listener, mapbox-gl calls console.error() for every ErrorEvent
     // (common when raster tiles fail or reload while panning) — Next dev then prints "[browser] Error" repeatedly.
-    map.on('error', () => {});
+    map.on('error', (e) => {
+      const msg = e.error?.message ?? '';
+      if (mapboxAuthHintShownRef.current) return;
+      if (
+        /401|403|Unauthorized|Forbidden|Not Authorized|Invalid.*token|invalid.*access token/i.test(
+          msg
+        )
+      ) {
+        mapboxAuthHintShownRef.current = true;
+        setMapboxAuthHint(
+          'Mapbox odmítl dlaždice (401/403). Zkontroluj v Mapbox Account → Tokens správný public token (pk.…), v sekci URL restrictions přidej doménu nasazení (např. *.vercel.app nebo tvou produkční URL), a v Vercel → Settings → Environment Variables nastav NEXT_PUBLIC_MAPBOX_TOKEN a znovu nasaď. V DevTools u „Provisional headers“ často blokuje rozšíření (adblock) — zkus anonymní okno.'
+        );
+      }
+    });
 
     map.on('load', () => {
       clearMapFog(map);
@@ -653,7 +668,23 @@ export function MapView() {
   if (!TOKEN) {
     return (
       <div className="flex items-center justify-center h-full bg-slate-950 text-rose-400 p-6 text-center">
-        Set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local
+        Set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local (and in Vercel env for production).
+      </div>
+    );
+  }
+
+  if (!isLikelyValidMapboxPublicToken(TOKEN)) {
+    return (
+      <div className="flex flex-col gap-2 items-center justify-center h-full bg-slate-950 text-amber-300 p-6 text-center text-sm max-w-lg mx-auto">
+        <p>
+          NEXT_PUBLIC_MAPBOX_TOKEN nevypadá jako platný public Mapbox token (očekává se tvar{' '}
+          <code className="text-amber-100/90">pk.…</code> se třemi tečkami oddělenými částmi).
+        </p>
+        <p className="text-zinc-400 text-xs leading-relaxed">
+          Zkontroluj, že v hodnotě není omylem celý řádek jako{' '}
+          <code className="text-zinc-300">NEXT_PUBLIC_MAPBOX_TOKEN=pk.…</code> ani uvozovky — nebo
+          zkopíruj token znovu z Mapbox Account.
+        </p>
       </div>
     );
   }
@@ -671,9 +702,20 @@ export function MapView() {
 
       <SearchBar onSelect={(lng, lat) => flyTo(lng, lat)} />
 
+      {mapboxAuthHint && (
+        <div
+          className="absolute top-[7.25rem] left-4 right-16 z-[22] rounded-xl border border-rose-500/40 px-3 py-2 text-xs text-rose-100 shadow-lg bg-slate-950/95 max-h-[40vh] overflow-y-auto"
+          role="alert"
+        >
+          {mapboxAuthHint}
+        </div>
+      )}
+
       {geoMessage && (
         <div
-          className="absolute top-[7.25rem] left-4 right-16 z-[21] rounded-xl border px-3 py-2 text-xs text-[#f8fafc] shadow-lg pointer-events-none"
+          className={`absolute left-4 right-16 z-[21] rounded-xl border px-3 py-2 text-xs text-[#f8fafc] shadow-lg pointer-events-none ${
+            mapboxAuthHint ? 'top-[11rem]' : 'top-[7.25rem]'
+          }`}
           style={{
             background: 'rgba(15, 23, 42, 0.92)',
             borderColor: 'var(--glass-border)',

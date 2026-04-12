@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Search, Loader2 } from 'lucide-react';
+import { normalizeMapboxToken } from '@/lib/utils/public-env';
 
 type Feature = {
   id: string;
@@ -18,7 +19,7 @@ export function SearchBar({
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<Feature[]>([]);
 
-  const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+  const token = normalizeMapboxToken(process.env.NEXT_PUBLIC_MAPBOX_TOKEN);
 
   const search = useCallback(
     async (query: string) => {
