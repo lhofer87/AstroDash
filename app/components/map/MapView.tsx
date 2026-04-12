@@ -15,7 +15,17 @@ import { useSpotStore } from '@/lib/stores/spot-store';
 import { useMapUiStore } from '@/lib/stores/map-ui-store';
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-const OWM_KEY = process.env.NEXT_PUBLIC_OWM_KEY;
+
+/** OWM tile URLs need the raw API key only. Mis-set env (e.g. value `NEXT_PUBLIC_OWM_KEY=abc...`) yields 401. */
+function normalizeOwmKey(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  let v = raw.trim();
+  const prefix = 'NEXT_PUBLIC_OWM_KEY=';
+  if (v.startsWith(prefix)) v = v.slice(prefix.length).trim();
+  return v || undefined;
+}
+
+const OWM_KEY = normalizeOwmKey(process.env.NEXT_PUBLIC_OWM_KEY);
 
 const STYLES: Record<BaseStyle, string> = {
   dark: 'mapbox://styles/mapbox/dark-v11',
@@ -52,49 +62,48 @@ function orderOverlayLayers(map: mapboxgl.Map) {
 const VIIRS_NIGHT_TILES =
   'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_DayNightBand_ENCC/default/2023-06-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png';
 
-function addRasterOverlays(map: mapboxgl.Map) {
-  if (!map.getSource('viirs-night-lights')) {
-    map.addSource('viirs-night-lights', {
-      type: 'raster',
-      tiles: [VIIRS_NIGHT_TILES],
-      tileSize: 256,
-      minzoom: 0,
-      maxzoom: 8,
-      bounds: [-180, -85, 180, 85],
-    });
-    map.addLayer({
-      id: 'light-pollution-layer',
-      type: 'raster',
-      source: 'viirs-night-lights',
-      layout: { visibility: 'none' },
-      paint: {
-        'raster-opacity': 0,
-        'raster-fade-duration': 0,
-      },
-    });
-  }
+/** NASA VIIRS + OWM rasters are heavy on mobile GPUs / network — add lazily (see rasterInitAllowedRef). */
+function ensureLightPollutionLayer(map: mapboxgl.Map) {
+  if (map.getSource('viirs-night-lights')) return;
+  map.addSource('viirs-night-lights', {
+    type: 'raster',
+    tiles: [VIIRS_NIGHT_TILES],
+    tileSize: 256,
+    minzoom: 0,
+    maxzoom: 8,
+    bounds: [-180, -85, 180, 85],
+  });
+  map.addLayer({
+    id: 'light-pollution-layer',
+    type: 'raster',
+    source: 'viirs-night-lights',
+    layout: { visibility: 'none' },
+    paint: {
+      'raster-opacity': 0,
+      'raster-fade-duration': 0,
+    },
+  });
+}
 
-  if (OWM_KEY && !map.getSource('clouds')) {
-    map.addSource('clouds', {
-      type: 'raster',
-      tiles: [
-        `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OWM_KEY}`,
-      ],
-      tileSize: 256,
-    });
-    map.addLayer({
-      id: 'clouds-layer',
-      type: 'raster',
-      source: 'clouds',
-      layout: { visibility: 'none' },
-      paint: {
-        'raster-opacity': 0,
-        'raster-fade-duration': 0,
-      },
-    });
-  }
-
-  orderOverlayLayers(map);
+function ensureCloudLayer(map: mapboxgl.Map) {
+  if (!OWM_KEY || map.getSource('clouds')) return;
+  map.addSource('clouds', {
+    type: 'raster',
+    tiles: [
+      `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${OWM_KEY}`,
+    ],
+    tileSize: 256,
+  });
+  map.addLayer({
+    id: 'clouds-layer',
+    type: 'raster',
+    source: 'clouds',
+    layout: { visibility: 'none' },
+    paint: {
+      'raster-opacity': 0,
+      'raster-fade-duration': 0,
+    },
+  });
 }
 
 /**
@@ -159,8 +168,17 @@ function createFallbackPinImageData(): ImageData {
   return ctx.getImageData(0, 0, w, h);
 }
 
-function ensureLucideMapPinImage(map: mapboxgl.Map, onReady: () => void): void {
+function ensureLucideMapPinImage(
+  map: mapboxgl.Map,
+  onReady: () => void,
+  opts?: { preferSync?: boolean }
+): void {
   if (map.hasImage(SAVED_SPOT_PIN_IMAGE)) {
+    onReady();
+    return;
+  }
+  if (opts?.preferSync) {
+    map.addImage(SAVED_SPOT_PIN_IMAGE, createFallbackPinImageData());
     onReady();
     return;
   }
@@ -182,13 +200,19 @@ function ensureLucideMapPinImage(map: mapboxgl.Map, onReady: () => void): void {
 }
 
 /** Symbol layer — Lucide MapPin; stays glued to lat/lng when panning/zooming. */
-function addSavedSpotsLayers(map: mapboxgl.Map, onComplete?: () => void) {
+function addSavedSpotsLayers(
+  map: mapboxgl.Map,
+  onComplete?: () => void,
+  preferSyncPin?: boolean
+) {
   if (map.getSource(SAVED_SPOTS_SOURCE)) {
     onComplete?.();
     return;
   }
 
-  ensureLucideMapPinImage(map, () => {
+  ensureLucideMapPinImage(
+    map,
+    () => {
     if (map.getSource(SAVED_SPOTS_SOURCE)) {
       onComplete?.();
       return;
@@ -219,7 +243,9 @@ function addSavedSpotsLayers(map: mapboxgl.Map, onComplete?: () => void) {
       },
     });
     onComplete?.();
-  });
+  },
+    { preferSync: preferSyncPin }
+  );
 }
 
 function syncSavedSpotsData(map: mapboxgl.Map) {
@@ -232,6 +258,15 @@ function syncSavedSpotsData(map: mapboxgl.Map) {
     return;
   }
   geo.setData(spotsToFeatureCollection(storeSpots));
+}
+
+/** Defer heavy raster / GeoJSON work so the base map can paint and the main thread stays responsive on phones. */
+function scheduleHeavyIdleWork(fn: () => void, timeoutMs: number) {
+  if (typeof requestIdleCallback !== 'undefined') {
+    requestIdleCallback(fn, { timeout: timeoutMs });
+  } else {
+    window.setTimeout(fn, Math.min(timeoutMs, 150));
+  }
 }
 
 export function MapView() {
@@ -256,6 +291,8 @@ export function MapView() {
   const prevBaseStyleRef = useRef<BaseStyle>(baseStyle);
   const locationPickSeqRef = useRef(0);
   const applyLayerVisibilityRef = useRef<() => void>(() => {});
+  /** On touch devices, skip NASA/OWM raster sources until this flips true (after idle) so WebGL + network are not hammered during first paint. */
+  const rasterInitAllowedRef = useRef(false);
 
   const [ready, setReady] = useState(false);
 
@@ -275,6 +312,12 @@ export function MapView() {
   const applyLayerVisibility = useCallback(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
+
+    if (rasterInitAllowedRef.current) {
+      ensureLightPollutionLayer(map);
+      if (OWM_KEY) ensureCloudLayer(map);
+      orderOverlayLayers(map);
+    }
 
     const lpOpacity =
       baseStyle === 'satellite' ? 0.58 : baseStyle === 'streets' ? 0.48 : 0.68;
@@ -372,17 +415,35 @@ export function MapView() {
 
     map.on('load', () => {
       clearMapFog(map);
-      addRasterOverlays(map);
-      applyLayerVisibilityRef.current();
-      addSavedSpotsLayers(map, () => {
+      if (!isTouchCoarse) {
+        rasterInitAllowedRef.current = true;
+      }
+
+      const finishHeavyInit = () => {
+        rasterInitAllowedRef.current = true;
         applyLayerVisibilityRef.current();
-        setReady(true);
-        map.once('idle', () => {
-          orderOverlayLayers(map);
-          applyLayerVisibilityRef.current();
-          syncSavedSpotsData(map);
-        });
-      });
+        addSavedSpotsLayers(
+          map,
+          () => {
+            applyLayerVisibilityRef.current();
+            map.once('idle', () => {
+              orderOverlayLayers(map);
+              applyLayerVisibilityRef.current();
+              syncSavedSpotsData(map);
+            });
+          },
+          isTouchCoarse
+        );
+      };
+
+      /** Show the map immediately — do not wait for VIIRS/OWM tiles or async SVG decode. */
+      setReady(true);
+
+      if (isTouchCoarse) {
+        scheduleHeavyIdleWork(finishHeavyInit, 1400);
+      } else {
+        finishHeavyInit();
+      }
     });
 
     map.on('click', (e) => {
@@ -472,19 +533,26 @@ export function MapView() {
     if (prevBaseStyleRef.current === baseStyle) return;
     prevBaseStyleRef.current = baseStyle;
 
+    const coarsePointer =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
     const onStyleLoad = () => {
       clearMapFog(map);
-      addRasterOverlays(map);
+      rasterInitAllowedRef.current = true;
       applyLayerVisibilityRef.current();
-      addSavedSpotsLayers(map, () => {
-        applyLayerVisibilityRef.current();
-        setReady(true);
-        map.once('idle', () => {
-          orderOverlayLayers(map);
+      addSavedSpotsLayers(
+        map,
+        () => {
           applyLayerVisibilityRef.current();
-          syncSavedSpotsData(map);
-        });
-      });
+          map.once('idle', () => {
+            orderOverlayLayers(map);
+            applyLayerVisibilityRef.current();
+            syncSavedSpotsData(map);
+          });
+        },
+        coarsePointer
+      );
     };
 
     map.setStyle(STYLES[baseStyle]);
@@ -547,10 +615,10 @@ export function MapView() {
     const map = mapRef.current;
     if (!map || !ready || !hydrated) return;
     if (!map.isStyleLoaded()) return;
-    addSavedSpotsLayers(map, () => {
-      syncSavedSpotsData(map);
-      orderOverlayLayers(map);
-    });
+    const src = map.getSource(SAVED_SPOTS_SOURCE);
+    if (!src || src.type !== 'geojson') return;
+    syncSavedSpotsData(map);
+    orderOverlayLayers(map);
   }, [spots, ready, hydrated]);
 
   useEffect(() => {
@@ -591,7 +659,14 @@ export function MapView() {
   }
 
   return (
-    <div className="relative w-full h-full min-h-[50vh]">
+    <div
+      className="relative w-full h-full min-h-[50vh]"
+      onPointerDownCapture={() => {
+        if (rasterInitAllowedRef.current) return;
+        rasterInitAllowedRef.current = true;
+        queueMicrotask(() => applyLayerVisibilityRef.current());
+      }}
+    >
       <div ref={containerRef} id="map-container" className="w-full h-full absolute inset-0" />
 
       <SearchBar onSelect={(lng, lat) => flyTo(lng, lat)} />

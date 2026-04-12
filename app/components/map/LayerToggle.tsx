@@ -31,14 +31,14 @@ export function LayerToggle({
 
   useEffect(() => {
     if (!layersOpen) return;
-    const onDown = (e: MouseEvent) => {
+    const onDown = (e: PointerEvent) => {
       const el = layersWrapRef.current;
       if (el && !el.contains(e.target as Node)) {
         setLayersOpen(false);
       }
     };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
   }, [layersOpen]);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ export function LayerToggle({
     `flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-[background,border-color,transform] ${
       active
         ? 'bg-[var(--star-blue)] border-[var(--star-blue)] text-[var(--obsidian)] shadow-md shadow-sky-500/15'
-        : 'bg-[var(--glass-bg)] backdrop-blur-md border-[var(--glass-border)] text-[#f8fafc] hover:bg-white/10'
+        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[#f8fafc] hover:bg-white/10 md:backdrop-blur-md'
     }`;
 
   const btnInner = (active: boolean) =>
@@ -92,9 +92,9 @@ export function LayerToggle({
 
         {layersOpen && (
           <div
-            className="absolute top-full right-0 mt-2 flex min-w-[10.5rem] flex-col gap-2 rounded-2xl border !p-2 shadow-2xl backdrop-blur-xl"
+            className="absolute top-full right-0 mt-2 flex min-w-[10.5rem] flex-col gap-2 rounded-2xl border !p-2 shadow-2xl md:backdrop-blur-xl"
             style={{
-              background: 'rgba(15, 23, 42, 0.94)',
+              background: 'rgba(15, 23, 42, 0.98)',
               borderColor: 'var(--glass-border)',
             }}
             role="menu"
