@@ -1,0 +1,540 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=Inter:wght@300;400;500;600&display=swap');
+@import 'tailwindcss';
+/* Limit class scanning to app + lib only (avoids huge work from scanning all of node_modules / repo). */
+@source "./**/*.{ts,tsx}";
+@source "../lib/**/*.{ts,tsx}";
+
+:root {
+  --obsidian: #020617;
+  --nebula: #0f172a;
+  --star-blue: #38bdf8;
+  --moon-gold: #fbbf24;
+  --comet-silver: #94a3b8;
+  --deep-navy: #1e293b;
+  --glass-bg: rgba(15, 23, 42, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+  --smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--obsidian);
+  color: #f8fafc;
+  font-family:
+    'Inter',
+    system-ui,
+    sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+.font-outfit {
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-radius: 1.5rem;
+  box-shadow: var(--glass-shadow);
+  padding: 1.5rem;
+  transition: var(--smooth);
+}
+
+/**
+ * Primary CTA (Figma: ~48px height, 12px vertical + 24px horizontal padding).
+ * Global `* { padding: 0 }` only sets horizontal padding via Tailwind utilities
+ * unless vertical padding is set explicitly — use this class for consistent CTAs.
+ */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 1rem;
+  background: var(--star-blue);
+  color: var(--obsidian);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 1rem;
+  line-height: 1.5;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-primary:active {
+  filter: brightness(0.96);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Location sheet: * { padding: 0 } can win over utilities — use real CSS classes */
+/* Dashboard (Figma node 10:2308): 431px column, 24px inset, cards max 383px */
+.dashboard-shell {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 431px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-top: 24px;
+  padding-bottom: 1rem;
+  min-height: calc(100dvh - 4rem);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dashboard-header-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dashboard-spot-list {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-spot-card.glass-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 383px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 16px;
+}
+
+/* Forecast strip inside spot card (compact for more cards on dashboard) */
+.figma-forecast-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+}
+
+.figma-forecast-scroll {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* Room so focus ring / rounded corners are not clipped by overflow */
+  padding: 0 6px 2px;
+  margin: 0 -6px;
+  width: calc(100% + 12px);
+  max-width: none;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+/* Same box model for every day so „Today“ highlight doesn’t shift content vertically */
+.figma-forecast-cell {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  /* Figma: den → ikona → % pod sebou; kompaktní výška kvůli více kartám na obrazovce */
+  gap: 4px;
+  width: 44px;
+  min-height: 64px;
+  padding: 6px 2px 7px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: transparent;
+}
+
+.figma-forecast-cell--today {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.42);
+}
+
+.figma-forecast-day-label-today {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #38bdf8;
+  text-align: center;
+}
+
+.figma-forecast-day-label {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #f8fafc;
+  text-align: center;
+}
+
+.figma-forecast-pct {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+/* 7-day strip on spot detail (Figma SpotDetailModal: Today pill + column per day) */
+.figma-forecast-scroll--detail {
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.figma-forecast-cell--detail {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 28px;
+  min-height: 56px;
+  padding: 6px 4px 8px;
+  border-radius: 14px;
+  background: transparent;
+  border: 2px solid transparent;
+}
+
+.figma-forecast-cell--detail-today {
+  min-width: 40px;
+  min-height: 72px;
+  padding: 8px 6px 10px;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+}
+
+.figma-forecast-day-label-detail {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.33;
+  color: #f8fafc;
+  text-align: center;
+}
+
+.figma-forecast-day-label-detail-today {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.33;
+  color: #38bdf8;
+  text-align: center;
+}
+
+.figma-forecast-pct-detail {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.33;
+  text-align: center;
+}
+
+.figma-forecast-seeing-detail {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 500;
+  font-size: 10px;
+  line-height: 1.2;
+  color: #94a3b8;
+  text-align: center;
+}
+
+
+.location-sheet-wrap {
+  box-sizing: border-box;
+  width: 100%;
+  padding-left: 24px;
+  padding-right: 24px;
+  padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0));
+}
+
+.location-sheet-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 383px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 25px;
+  border-radius: 24px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+.location-sheet-input {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(148, 163, 184, 0.15);
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.21;
+  color: #f8fafc;
+  outline: none;
+}
+
+.location-sheet-input::placeholder {
+  color: rgba(248, 250, 252, 0.5);
+}
+
+.location-sheet-input:focus {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+}
+
+/* Map search: explicit padding so icon is not flush to the edge (* reset can fight utilities) */
+.map-search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 50px;
+  padding: 0.625rem 1rem 0.625rem 1.125rem;
+  border-radius: 1rem;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Skeleton loading (dashboard / forecast placeholders) */
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.mapboxgl-ctrl-logo {
+  opacity: 0.5;
+}
+
+/* Full-app starfield (fallback when /images/starfield-bg.png is absent) */
+.app-starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--obsidian);
+  /* Drop public/images/starfield-bg.png and uncomment the url() line to use the Figma asset */
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% 100%, rgba(56, 189, 248, 0.06), transparent 55%),
+    radial-gradient(1.5px 1.5px at 8% 12%, rgba(248, 250, 252, 0.85), transparent),
+    radial-gradient(1px 1px at 22% 38%, rgba(248, 250, 252, 0.55), transparent),
+    radial-gradient(1.5px 1.5px at 41% 18%, rgba(248, 250, 252, 0.7), transparent),
+    radial-gradient(1px 1px at 63% 52%, rgba(248, 250, 252, 0.5), transparent),
+    radial-gradient(2px 2px at 78% 28%, rgba(248, 250, 252, 0.65), transparent),
+    radial-gradient(1px 1px at 91% 71%, rgba(248, 250, 252, 0.45), transparent),
+    radial-gradient(1px 1px at 15% 67%, rgba(248, 250, 252, 0.4), transparent),
+    radial-gradient(1.5px 1.5px at 55% 8%, rgba(248, 250, 252, 0.55), transparent);
+  background-size:
+    auto,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.app-shell-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Spot detail (Figma SpotDetailModal ~24px radius, stacked sections) */
+.spot-detail-card {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 383px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 20px;
+  border-radius: 24px;
+  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+
+.spot-detail-tonight-panel {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(148, 163, 184, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.spot-detail-metric {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.spot-detail-metric-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.spot-detail-hourly-scroll {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 4px 6px;
+  margin: 0 -4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.spot-detail-hour-cell {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 72px;
+  padding: 10px 8px 8px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.spot-detail-hour-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  padding-top: 6px;
+  margin-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.btn-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1rem;
+  background: var(--glass-bg);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--glass-border);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--smooth);
+}
+
+.btn-icon:hover {
+  background: var(--star-blue);
+  color: var(--obsidian);
+  transform: translateY(-2px);
+}
+
+#map-container {
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  background-color: #020617;
+}
+
+.spot-popup .mapboxgl-popup-content {
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.75rem;
+  padding: 10px 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.spot-popup .mapboxgl-popup-tip {
+  border-top-color: rgba(15, 23, 42, 0.92);
+}

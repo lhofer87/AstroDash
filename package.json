@@ -1,0 +1,34 @@
+{
+  "name": "astrodash",
+  "version": "1.0.0",
+  "description": "Unified astronomy observation dashboard",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "latest",
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "latest",
+    "dexie": "^4.4.2",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.3",
+    "lucide-react": "^0.479.0",
+    "mapbox-gl": "^3.10.1",
+    "next": "latest",
+    "postcss": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest",
+    "typescript": "^6.0.2",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5"
+  }
+}
