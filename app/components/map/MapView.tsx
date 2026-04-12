@@ -332,6 +332,10 @@ export function MapView() {
     const ui = useMapUiStore.getState();
     prevBaseStyleRef.current = ui.baseStyle;
 
+    const isTouchCoarse =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(pointer: coarse)').matches;
+
     const map = new mapboxgl.Map({
       container: containerRef.current,
       style: STYLES[ui.baseStyle],
@@ -339,7 +343,12 @@ export function MapView() {
       zoom: ui.zoom,
       pitch: ui.pitch,
       bearing: ui.bearing,
-      preserveDrawingBuffer: true,
+      /** Default false — `true` keeps the WebGL buffer after each frame and tanks performance on phones. Only enable if you export the canvas to an image. */
+      preserveDrawingBuffer: false,
+      /** Slightly cheaper GPU path on touch devices (Mapbox still looks fine for map tiles). */
+      antialias: !isTouchCoarse,
+      /** Less compositing work while panning/zooming. */
+      fadeDuration: isTouchCoarse ? 0 : 150,
     });
 
     mapRef.current = map;
