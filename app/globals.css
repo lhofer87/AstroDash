@@ -239,6 +239,24 @@ h3,
   box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
 }
 
+button.figma-forecast-cell--detail-button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+button.figma-forecast-cell--detail-button:hover:not(.figma-forecast-cell--detail-today) {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+button.figma-forecast-cell--detail-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.55);
+}
+
 .figma-forecast-day-label-detail {
   font-family: 'Inter', system-ui, sans-serif;
   font-weight: 500;

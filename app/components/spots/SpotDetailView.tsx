@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   Cloud,
@@ -59,6 +59,13 @@ function HourCloudIcon({ pct }: { pct: number }) {
   );
 }
 
+function longWeekdayLabel(dateKey: string): string {
+  const [y, m, d] = dateKey.split('-').map(Number);
+  if (!y || !m || !d) return '';
+  const dt = new Date(y, m - 1, d);
+  return dt.toLocaleDateString(undefined, { weekday: 'long' });
+}
+
 export function SpotDetailView({ spot }: { spot: Spot }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,10 +73,12 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
   const [bundle, setBundle] = useState<Awaited<
     ReturnType<typeof fetchForecastBundle>
   > | null>(null);
+  const [selectedNightKey, setSelectedNightKey] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setSelectedNightKey(null);
     void (async () => {
       const coords = normalizeLatLng(spot.lat, spot.lng);
       try {
@@ -107,13 +116,42 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
     };
   }, [spot.id, spot.lat, spot.lng]);
 
-  const nightKey = firstNightKey(nights);
+  const todayNightKey = firstNightKey(nights);
+  const availableNightKeys = nights
+    .slice(0, 7)
+    .map((n) => n.dateKey)
+    .filter((k) => k !== 'summary');
+  const activeNightKey =
+    selectedNightKey && availableNightKeys.includes(selectedNightKey)
+      ? selectedNightKey
+      : todayNightKey;
+  const isTodaySelected =
+    activeNightKey === todayNightKey || activeNightKey == null;
+  const selectedVerdict =
+    activeNightKey != null
+      ? nights.find((n) => n.dateKey === activeNightKey)
+      : nights[0];
+  const selectedWeekday =
+    !isTodaySelected && activeNightKey
+      ? longWeekdayLabel(activeNightKey)
+      : '';
+  const conditionsTitle = isTodaySelected
+    ? "Tonight's Conditions"
+    : selectedWeekday
+      ? `${selectedWeekday} Night`
+      : 'Night Conditions';
+  const hourlyTitle = isTodaySelected
+    ? 'Tonight (Hourly)'
+    : selectedWeekday
+      ? `${selectedWeekday} Night (Hourly)`
+      : 'Night (Hourly)';
+
   const hourlySlots =
     bundle?.forecast?.hourly && !error
       ? buildTonightHourlySlots(
           bundle.forecast.hourly,
           bundle.sevenTimer?.dataseries ?? null,
-          nightKey
+          activeNightKey
         )
       : [];
   const summary =
@@ -121,12 +159,16 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
       ? tonightConditionsSummary(
           bundle.forecast.hourly,
           bundle.sevenTimer?.dataseries ?? null,
-          nightKey
+          activeNightKey
         )
       : null;
 
-  const seeingTonight =
-    summary != null ? tonightSeeingDisplay(nights, summary.seeingArcsec) : null;
+  const seeingSelected =
+    summary != null
+      ? selectedVerdict && selectedVerdict.dateKey !== 'summary'
+        ? (selectedVerdict.bestSeeing ?? summary.seeingArcsec)
+        : tonightSeeingDisplay(nights, summary.seeingArcsec)
+      : null;
 
   const coordsLine = `${spot.lat.toFixed(4)}°, ${spot.lng.toFixed(4)}°`;
 
@@ -172,7 +214,7 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
             <>
               <section className="spot-detail-tonight-panel">
                 <h2 className="font-outfit text-[15px] font-semibold text-[#f8fafc] mb-3">
-                  Tonight&apos;s Conditions
+                  {conditionsTitle}
                 </h2>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="spot-detail-metric">
@@ -200,8 +242,8 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
                         Seeing
                       </p>
                       <p className="text-base font-semibold text-[#f8fafc] tabular-nums">
-                        {seeingTonight != null
-                          ? `${seeingTonight.toFixed(1)}″`
+                        {seeingSelected != null
+                          ? `${seeingSelected.toFixed(1)}″`
                           : '—'}
                       </p>
                     </div>
@@ -237,7 +279,7 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
 
               <section>
                 <h2 className="font-outfit text-[15px] font-semibold text-[#f8fafc] mb-2">
-                  Tonight (Hourly)
+                  {hourlyTitle}
                 </h2>
                 {hourlySlots.length === 0 ? (
                   <p className="text-sm text-[var(--comet-silver)]">
@@ -296,7 +338,12 @@ export function SpotDetailView({ spot }: { spot: Spot }) {
                 <h2 className="font-outfit text-[15px] font-semibold text-[#f8fafc] mb-2">
                   7-Day Forecast
                 </h2>
-                <ForecastTimeline nights={nights} variant="detail" />
+                <ForecastTimeline
+                  nights={nights}
+                  variant="detail"
+                  selectedKey={activeNightKey}
+                  onSelect={(key) => setSelectedNightKey(key)}
+                />
               </section>
             </>
           )}

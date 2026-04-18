@@ -47,13 +47,20 @@ export function ForecastTimeline({
   nights,
   variant = 'dashboard',
   className = '',
+  selectedKey,
+  onSelect,
 }: {
   nights: NightVerdict[];
   /** `detail` = spot detail 7-day strip (Figma SpotDetailModal): Today pill + 12px type, max 7 days. */
   variant?: 'dashboard' | 'detail';
   className?: string;
+  /** When set (detail variant), this night is highlighted as the active selection. */
+  selectedKey?: string | null;
+  /** When provided, cells become buttons that trigger this callback on click. */
+  onSelect?: (nightKey: string) => void;
 }) {
   const list = variant === 'detail' ? nights.slice(0, 7) : nights;
+  const interactive = variant === 'detail' && typeof onSelect === 'function';
 
   return (
     <div className={`figma-forecast-block ${className}`.trim()}>
@@ -71,24 +78,21 @@ export function ForecastTimeline({
           const pctColor = cloudPercentColor(pct);
 
           if (variant === 'detail') {
-            return (
-              <div
-                key={n.dateKey}
-                className={
-                  isToday
-                    ? 'figma-forecast-cell--detail figma-forecast-cell--detail-today'
-                    : 'figma-forecast-cell--detail'
-                }
-              >
-                <span
-                  className={
-                    isToday
-                      ? 'figma-forecast-day-label-detail-today'
-                      : 'figma-forecast-day-label-detail'
-                  }
-                >
-                  {label}
-                </span>
+            const isSelected =
+              selectedKey != null ? n.dateKey === selectedKey : isToday;
+            const cellClass = [
+              'figma-forecast-cell--detail',
+              isSelected ? 'figma-forecast-cell--detail-today' : '',
+              interactive ? 'figma-forecast-cell--detail-button' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
+            const labelClass = isSelected
+              ? 'figma-forecast-day-label-detail-today'
+              : 'figma-forecast-day-label-detail';
+            const cellContent = (
+              <>
+                <span className={labelClass}>{label}</span>
                 <CloudMark pct={pct} />
                 <span
                   className="figma-forecast-pct-detail"
@@ -101,6 +105,25 @@ export function ForecastTimeline({
                     {n.bestSeeing.toFixed(1)}″
                   </span>
                 )}
+              </>
+            );
+            if (interactive) {
+              return (
+                <button
+                  type="button"
+                  key={n.dateKey}
+                  className={cellClass}
+                  onClick={() => onSelect?.(n.dateKey)}
+                  aria-pressed={isSelected}
+                  aria-label={`Show hourly forecast for ${label}`}
+                >
+                  {cellContent}
+                </button>
+              );
+            }
+            return (
+              <div key={n.dateKey} className={cellClass}>
+                {cellContent}
               </div>
             );
           }
